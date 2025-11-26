@@ -1,0 +1,27 @@
+{
+  "name": "n8n-nodes-iotivp-verify",
+  "version": "0.1.0",
+  "description": "n8n community node: IoTIVP Verify (Gateway) – decodes IoTIVP-Binary packets, converts to IoTIVP-Core JSON, and runs IoTIVP-Verify to produce a 0–100 integrity score.",
+  "license": "MIT",
+  "keywords": [
+    "n8n-nodes",
+    "n8n-community-node",
+    "iot",
+    "security",
+    "integrity",
+    "iotivp"
+  ],
+  "main": "dist/IotivpVerify.node.js",
+  "types": "dist/IotivpVerify.node.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "n8n-workflow": "^1.0.0",
+    "n8n-core": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
