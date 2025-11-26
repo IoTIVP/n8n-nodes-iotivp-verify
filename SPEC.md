@@ -136,3 +136,165 @@ Key objectives:
 As real decoding and verification logic is implemented, this workflow will evolve into a full integrity pipeline. The structure shown here remains stable, ensuring long-term compatibility with future IoTIVP-Core, IoTIVP-Binary, and IoTIVP-Verify releases.
 
 This marks the first canonical integration pattern for IoTIVP inside n8n.
+
+...
+
+# Example Workflow 2 — Robotics Integrity Gate (Fake-Verifier Mode)
+
+This workflow demonstrates how the IoTIVP Verify (Gateway) node acts as a safety and trust layer inside a robotics automation pipeline. Mobile robots rely on clean, untampered, high-accuracy sensor data. IoTIVP enforces integrity BEFORE the robot controller accepts any telemetry.
+
+Fake-Verifier Mode is used here until real binary decoding and verification logic are implemented.
+
+---
+
+## 🛠 Workflow Overview
+
+    [Robot Sensor Packet Ingest]
+                ↓
+    [IoTIVP Verify (Gateway)]
+                ↓
+      [IF: Integrity ≥ 85?]
+           ↙                ↘
+[Trusted Robotics Data]   [Unsafe / Suspicious Data]
+
+---
+
+## 1. Sensor Packet Ingest — “Robot Telemetry”
+
+Robotic systems (ESP32, ROS/ROS2 nodes, or custom hardware) send binary packets into n8n.
+
+Example Input:
+
+    {
+      "robot_id": "alpha-unit-03",
+      "packet_hex": "88f31002aa7f349fe181..."
+    }
+
+This represents IMU, ToF, encoder, or low-rate LiDAR summaries.
+
+---
+
+## 2. IoTIVP Verify (Gateway) — Fake-Verifier Mode
+
+The node attaches simulated IoTIVP-Core and IoTIVP-Verify results.
+
+Example Output:
+
+    {
+      "robot_id": "alpha-unit-03",
+
+      "core_packet": {
+        "header": 1,
+        "timestamp": 1732212005,
+        "device_id": 103,
+        "nonce": 12,
+        "fields": {
+          "imu_ax": 0.03,
+          "imu_ay": -0.01,
+          "imu_az": 9.81,
+          "distance_cm": 142,
+          "battery": 87
+        },
+        "hash": "9ac3f2d1",
+        "_meta": {
+          "mode": "fake-verifier",
+          "packet_hex_seen": true
+        }
+      },
+
+      "verify_result": {
+        "valid": true,
+        "integrity_score": 88,
+        "flags": {
+          "hash_mismatch": false,
+          "timestamp_expired": false,
+          "nonce_reuse": false,
+          "value_out_of_range": []
+        },
+        "_meta": {
+          "mode": "fake-verifier"
+        }
+      }
+    }
+
+---
+
+## 3. IF Node — “Is This Robotics Data Safe?”
+
+Robotics requires stricter trust margins.
+
+Integrity Condition:
+
+    verify_result.integrity_score >= 85
+
+Branch logic:
+
+    - TRUE → Data is safe for navigation or processing
+    - FALSE → Data is unsafe and must be isolated
+
+Even a single tampered packet can cause:
+    - navigation drift
+    - failed obstacle detection
+    - mapping corruption
+    - unsafe actuator behavior
+
+---
+
+## 4. Trusted Robotics Data — Fusion, Control, Missions
+
+High-integrity packets flow into the robot’s control system.
+
+Possible actions:
+
+    - Publish clean data to MQTT robotics topics
+    - Forward to ROS/ROS2 bridge
+    - Feed into SLAM or sensor-fusion modules
+    - Update robot state estimation (odometry, IMU)
+    - Log normal operation metrics
+
+Example safe publish:
+
+    topic: robot/alpha-unit-03/telemetry
+    payload:
+        {
+          "distance_cm": 142,
+          "imu": [0.03, -0.01, 9.81],
+          "battery": 87,
+          "integrity": 88
+        }
+
+---
+
+## 5. Unsafe / Suspicious Data — Quarantine & Alert
+
+If a packet appears tampered or fails verification, it is blocked.
+
+Possible actions:
+
+    - Issue Robotics Safety Alert (Telegram / Slack)
+    - Write event to "Robot Safety Log"
+    - Pause navigation (soft-stop)
+    - Trigger emergency-stop if required
+    - Save raw packet for forensics
+
+Example alert message:
+
+    ALERT: Suspicious telemetry detected from alpha-unit-03.
+    Action: Navigation paused.
+
+---
+
+## Purpose of This Workflow
+
+This example shows IoTIVP as a **robotics safety filter**, ensuring that telemetry is:
+
+    - trustworthy
+    - untampered
+    - valid
+    - fresh
+    - safe to use for motion planning and control
+
+Robotics systems demand deterministic, high-confidence data — IoTIVP provides the integrity layer that makes that possible.
+
+This is the second official integration pattern for IoTIVP inside n8n.
+
