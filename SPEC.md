@@ -298,3 +298,368 @@ Robotics systems demand deterministic, high-confidence data — IoTIVP provides 
 
 This is the second official integration pattern for IoTIVP inside n8n.
 
+# Example Workflow 3 — BLE / UWB Device Integrity Gate (Fake-Verifier Mode)
+
+This workflow demonstrates how the IoTIVP Verify (Gateway) node acts as a trust layer for Bluetooth Low Energy (BLE) and Ultra-Wideband (UWB) location/telemetry packets. BLE/UWB systems are frequently used for:
+
+    - indoor positioning
+    - asset tracking
+    - access control
+    - wearables
+    - proximity detection
+    - motion / presence sensing
+
+These systems are vulnerable to:
+    - replay attacks
+    - relay attacks (distance extension)
+    - spoofed beacons
+    - manipulated signal payloads
+
+IoTIVP enforces **integrity** before location or telemetry data is trusted by downstream systems.
+
+---
+
+## 🛰 Workflow Overview
+
+    [BLE/UWB Packet Ingest]
+                ↓
+    [IoTIVP Verify (Gateway)]
+                ↓
+      [IF: Integrity ≥ 75?]
+           ↙                ↘
+[Trusted Telemetry]    [Suspicious / Tampered Data]
+
+---
+
+## 1. Packet Ingest — “BLE/UWB Telemetry Source”
+
+A BLE beacon, wearable, tag, or UWB anchor node sends a packet into n8n.
+
+Example Input:
+
+    {
+      "tag_id": "uwb-tag-09",
+      "packet_hex": "a1b4f2089033bb1c..."
+    }
+
+This can represent:
+    - BLE manufacturer data
+    - UWB ToF (time-of-flight) results
+    - RSSI metadata
+    - ranging distance
+    - device battery status
+
+Fake-Verifier Mode does not parse this yet, but real logic will.
+
+---
+
+## 2. IoTIVP Verify (Gateway) — Fake-Verifier Mode
+
+The node attaches simulated IoTIVP-Core and IoTIVP-Verify results.
+
+Example Output:
+
+    {
+      "tag_id": "uwb-tag-09",
+
+      "core_packet": {
+        "header": 1,
+        "timestamp": 1732212012,
+        "device_id": 209,
+        "nonce": 5,
+        "fields": {
+          "distance_cm": 248,
+          "rssi": -61,
+          "battery": 78
+        },
+        "hash": "8bb49dfe",
+        "_meta": {
+          "mode": "fake-verifier",
+          "packet_hex_seen": true
+        }
+      },
+
+      "verify_result": {
+        "valid": true,
+        "integrity_score": 81,
+        "flags": {
+          "hash_mismatch": false,
+          "timestamp_expired": false,
+          "nonce_reuse": false,
+          "value_out_of_range": []
+        },
+        "_meta": {
+          "mode": "fake-verifier"
+        }
+      }
+    }
+
+This represents a clean, high-integrity BLE/UWB measurement.
+
+---
+
+## 3. IF Node — “Is This BLE/UWB Data Trustworthy?”
+
+BLE/UWB systems tolerate slightly lower thresholds than robotics, but still require integrity verification.
+
+Integrity Condition:
+
+    verify_result.integrity_score >= 75
+
+Branch logic:
+
+    - TRUE → telemetry is trusted  
+    - FALSE → telemetry is suspicious  
+
+BLE/UWB spoofing is common, so this gate is essential.
+
+---
+
+## 4. Trusted Telemetry — Location, Access, Tracking
+
+High-integrity packets flow into systems that rely on BLE/UWB measurements.
+
+Possible downstream actions:
+
+    - Update location tracking databases
+    - Trigger access-control logic (doors, gates, lockers)
+    - Feed indoor positioning systems (IPS)
+    - Update asset tracking dashboards
+    - Drive geofencing automations (enter/exit zones)
+    - Notify operators of safe device movement
+
+Example location update:
+
+    tag_id: uwb-tag-09
+    estimated_location:
+        x: 4.3
+        y: 6.1
+        z: 1.0
+    rssi: -61
+    battery: 78
+    integrity: 81
+
+This allows safe and reliable real-time location updates.
+
+---
+
+## 5. Suspicious / Tampered Data — Isolate & Alert
+
+Integrity failures are common in BLE/UWB environments due to:
+
+    - replayed packets
+    - forged tag IDs
+    - signal amplification hacks
+    - manipulated distance values (UWB relay attacks)
+
+Possible downstream actions:
+
+    - Send a “BLE/UWB Integrity Alert”
+    - Log packet into “Suspicious Telemetry” datastore
+    - Disable tag or deny access
+    - Trigger fallback location-checking logic
+    - Store packet for later investigation
+
+Example alert:
+
+    ALERT: Suspicious BLE/UWB packet from tag uwb-tag-09.
+    Integrity Score: 42
+    Action: Access denied & telemetry quarantined.
+
+---
+
+## Purpose of This Workflow
+
+This workflow shows IoTIVP acting as a **location-integrity gateway**, protecting systems that rely on BLE/UWB telemetry.
+
+IoTIVP ensures:
+
+    - No spoofed proximity signals
+    - No replayed BLE advertising frames
+    - No forged UWB ranging data
+    - No tampered battery/telemetry readings
+    - No unsafe access or tracking updates
+
+BLE/UWB systems become significantly more secure when combined with IoTIVP’s integrity verification.
+
+This is the third official integration pattern for IoTIVP inside n8n.
+
+# Example Workflow 4 — Facility Sensor Reliability Gate (Fake-Verifier Mode)
+
+This workflow demonstrates how the IoTIVP Verify (Gateway) node acts as a reliability and integrity filter for facility IoT sensors. Buildings depend on accurate, untampered sensor data for:
+
+    - access control
+    - fire/smoke detection
+    - HVAC & environmental control
+    - occupancy monitoring
+    - leak detection
+    - security alarms
+    - equipment health monitoring
+
+IoTIVP prevents corrupted, spoofed, or faulty sensor packets from making their way into critical building systems.
+
+---
+
+## 🛰 Workflow Overview
+
+    [Facility Sensor Packet Ingest]
+                ↓
+    [IoTIVP Verify (Gateway)]
+                ↓
+     [IF: Integrity ≥ 70?]
+           ↙                ↘
+[Trusted Facility Data]   [Fault / Tampered Data]
+
+---
+
+## 1. Packet Ingest — “Facility Sensor Input”
+
+Building sensors communicate via BLE, Zigbee, WiFi, LoRa, or proprietary RF.  
+Packets arrive in binary form:
+
+Example Input:
+
+    {
+      "sensor_id": "smoke-12A",
+      "packet_hex": "22ef71aa4981cb..."
+    }
+
+Common facility sensors include:
+
+    - smoke/CO detectors
+    - HVAC air quality sensors (CO₂, VOC)
+    - temperature/humidity monitors
+    - door/contact sensors
+    - motion/occupancy PIR sensors
+    - water leak detectors
+    - vibration/health sensors (elevators, pumps)
+
+Fake-Verifier Mode simulates output until real logic is implemented.
+
+---
+
+## 2. IoTIVP Verify (Gateway) — Fake-Verifier Mode
+
+The node produces simulated IoTIVP-Core and IoTIVP-Verify outputs.
+
+Example Output:
+
+    {
+      "sensor_id": "smoke-12A",
+
+      "core_packet": {
+        "header": 1,
+        "timestamp": 1732212025,
+        "device_id": 312,
+        "nonce": 4,
+        "fields": {
+          "smoke_level": 0.01,
+          "co_ppm": 2,
+          "battery": 94
+        },
+        "hash": "7ac902fe",
+        "_meta": {
+          "mode": "fake-verifier",
+          "packet_hex_seen": true
+        }
+      },
+
+      "verify_result": {
+        "valid": true,
+        "integrity_score": 77,
+        "flags": {
+          "hash_mismatch": false,
+          "timestamp_expired": false,
+          "nonce_reuse": false,
+          "value_out_of_range": []
+        },
+        "_meta": {
+          "mode": "fake-verifier"
+        }
+      }
+    }
+
+This simulates typical facility sensor telemetry.
+
+---
+
+## 3. IF Node — “Is This Facility Sensor Data Reliable?”
+
+Facilities tolerate a moderate threshold.
+
+Integrity Requirement:
+
+    verify_result.integrity_score >= 70
+
+Branch logic:
+
+    - TRUE → trusted environmental or safety data
+    - FALSE → data is suspicious or faulty
+
+Real-world reasons for failure:
+
+    - failing sensor hardware
+    - replayed/relayed RF packets
+    - spoofed access sensors
+    - miscalibrated readings
+    - corrupted battery or health values
+
+---
+
+## 4. Trusted Facility Data — Automation, Alerts, Logging
+
+High-integrity sensor readings feed into building systems.
+
+Possible actions:
+
+    - Update HVAC controller (temperature, CO₂, VOC)
+    - Log environmental metrics
+    - Drive occupancy-based automation
+    - Update access-control decisions
+    - Write to “Facility Health Dashboard”
+    - Trigger ventilation based on CO₂/air quality
+
+Example trusted row (Google Sheets):
+
+    | timestamp   | sensor_id | smoke_level | co_ppm | battery | integrity_score |
+    |-------------|-----------|-------------|--------|---------|-----------------|
+    | 1732212025  | smoke-12A | 0.01        | 2      | 94      | 77              |
+
+---
+
+## 5. Fault / Tampered Data — Quarantine & Safety Alerts
+
+Untrusted data is potentially dangerous.
+
+Possible responses:
+
+    - Send a “Facility Sensor Fault/Tamper Alert”
+    - Flag sensor for maintenance check
+    - Log event to “Safety Exceptions Log”
+    - Block data from reaching HVAC, security, or building logic
+    - Temporarily disable automation relying on that sensor
+    - Store raw packet for forensics
+
+Example alert:
+
+    ALERT: Unreliable or tampered telemetry detected from sensor smoke-12A.
+    Integrity Score: 41
+    Action: Ignored packet and logged event.
+
+This prevents false alarms, HVAC overreactions, or bad access decisions.
+
+---
+
+## Purpose of This Workflow
+
+This workflow positions IoTIVP as a **facility integrity and reliability layer**, ensuring safety-critical systems respond only to:
+
+    - high-confidence data
+    - untampered telemetry
+    - valid environmental readings
+    - trustworthy access events
+
+Buildings, campuses, consulates, and secure facilities *depend* on reliable sensor data. IoTIVP becomes the missing trust layer in modern Smart Building architectures.
+
+This is the fourth official integration pattern for IoTIVP inside n8n.
+
